@@ -4,6 +4,8 @@
 
 Baton is a simple app that allows AAC software users to upload data for research purposes.
 
+**NOTE: This is a fork of the original project NOT uploading to a backend server but keeping it local"
+
 Currently, Baton supports extracting data from:
 
 - Dasher
@@ -31,3 +33,4 @@ yarn dev
 ```
 
 To build new releases, increment the version (without tagging) with `npm --no-git-tag-version version [major|minor|patch]`. Then, create a **draft** release on the GitHub repository and push. The app will then be built and available under the draft release. Once the next version is ready, publish the draft. GitHub will automatically tag the correct commit.
+
