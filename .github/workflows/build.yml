@@ -1,6 +1,8 @@
 name: Build
 
-on: push
+on:
+  release:
+    types: [created]
 
 jobs:
   release:
@@ -75,3 +77,17 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           APPLE_ID: ${{ secrets.APPLE_ID }}
           APPLE_ID_PASSWORD: ${{ secrets.APPLE_ID_PASSWORD }}
+
+      - name: Upload Windows artifact
+        if: runner.os == 'Windows'
+        uses: actions/upload-artifact@v4
+        with:
+          name: Baton-Windows
+          path: dist/Baton-Windows.exe
+
+      - name: Upload macOS artifact
+        if: runner.os == 'macOS'
+        uses: actions/upload-artifact@v4
+        with:
+          name: Baton-macOS
+          path: dist/Baton-macOS.dmg

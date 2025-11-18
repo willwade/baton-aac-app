@@ -32,5 +32,11 @@ yarn install
 yarn dev
 ```
 
-To build new releases, increment the version (without tagging) with `npm --no-git-tag-version version [major|minor|patch]`. Then, create a **draft** release on the GitHub repository and push. The app will then be built and available under the draft release. Once the next version is ready, publish the draft. GitHub will automatically tag the correct commit.
+To build new releases:
+
+1. Increment the version: `npm --no-git-tag-version version [major|minor|patch]`
+2. Commit and push: `git commit -am "Bump version to X.X.X" && git push`
+3. Create a **draft** release on GitHub with tag `vX.X.X` (matching package.json version)
+4. The GitHub Actions workflow will automatically build and upload the installers to the draft release
+5. Once ready, publish the draft release
 
