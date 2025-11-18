@@ -3,140 +3,108 @@ import { Typography, Paper } from "@material-ui/core";
 
 const ConsentText = () => (
   <Paper style={{ maxHeight: "50vh", overflow: "scroll", padding: "1rem" }}>
+    <Typography variant="h6" gutterBottom>
+      Welcome to Baton AAC Data Export Tool
+    </Typography>
+
     <Typography gutterBottom>
-      You are invited to take part in a research study collecting sentences
-      written by users of Augmentative and Alternative Communication (AAC)
-      interfaces. Contributed sentences will become part of a public data set.
-      This data set will be available for download by researchers working to
-      improve AAC text entry interfaces.
+      This application helps you export and backup your AAC (Augmentative and
+      Alternative Communication) text data. All data is encrypted and stored
+      locally on your computer - nothing is uploaded to any server or shared
+      automatically.
     </Typography>
 
     <Typography gutterBottom component="span">
-      This study is being conducted by:
+      <b>What this tool does:</b>
       <ul>
         <li>
-          Dr. Keith Vertanen from the Department of Computer Science at Michigan
-          Technological University. Dr. Vertanen is an expert on text input by
-          people with diverse abilities. He contributes to the open-source AAC
-          text entry interfaces Dasher and Nomon. He has been a consultant for
-          Tobii Dynavox, helping to improve gaze-based text input. He is a
-          recipient of a National Science Foundation (NSF) CAREER award to
-          investigate context-aware AAC text input.
+          Reads text files from your AAC interface (such as Dasher, Grid, or
+          other communication software)
         </li>
+        <li>Lets you review and select which phrases you want to export</li>
+        <li>Encrypts your selected phrases locally using secure encryption</li>
         <li>
-          Will Wade, PGDip, Bsc (Hons) is a Senior AAC Consultant at the Ace
-          Centre. He leads access assessments for individuals across the
-          northwest of England. He teaches on a Masters course in Assistive
-          Technology at Manchester Metropolitan University.
-        </li>
-        <li>
-          Owen Kent is an entrepreneur and researcher focusing on assistive
-          technologies. A graduate of UC Berkeley, he has over seven years of
-          experience advising engineering teams ranging from high school
-          students to postdocs building technology for people with disabilities.
+          Saves the encrypted data to a file on your computer that you control
         </li>
       </ul>
     </Typography>
 
     <Typography gutterBottom component="span">
-      To take part, you must meet the following requirements:
+      <b>Privacy and Security:</b>
       <ul>
-        <li>You must be 18 years of age or older</li>
         <li>
-          You must use an AAC interface for at least some of your communication
-          needs
+          <b>Local Only:</b> All encryption happens on your computer. No data is
+          sent to any server or uploaded anywhere.
         </li>
         <li>
-          You must use an AAC interface that logs your writing to a simple text
-          file (such as Dasher)
+          <b>You Control Everything:</b> You choose which phrases to export,
+          where to save the file, and what to do with it.
         </li>
-        <li>You must not have a cognitive impairment</li>
+        <li>
+          <b>Secure Encryption:</b> Your data is encrypted using
+          industry-standard encryption (libsodium sealed box encryption).
+        </li>
+        <li>
+          <b>No Background Activity:</b> This application only runs when you
+          open it. It does not monitor your computer or run in the background.
+        </li>
       </ul>
     </Typography>
 
-    <Typography gutterBottom>
-      If you agree to take part, you will install our custom application on your
-      computer. You will point the application at a text file of things you have
-      written using your AAC interface. You can then select whatever sentences
-      you would like to export. The application encrypts your selected phrases
-      locally and saves them to a file on your computer. You can then share this
-      encrypted file with the project at your convenience. You can export as
-      many sentences as you would like. The application only runs upon request;
-      it does not run in the background or otherwise monitor your day-to-day
-      computer activities. You can uninstall the application at any time.
-    </Typography>
-
     <Typography gutterBottom component="span">
-      We take your privacy seriously. When you start our application, you can
-      choose the amount of information you want associated with the sentences
-      you export:
+      <b>Privacy Options:</b> You can choose how much information to include
+      with your exported data:
       <ol>
         <li>
-          <b>None:</b> Only the text of your selected sentences will be
-          exported. Your sentences will be added to a large anonymous pool of
-          sentences. There will be no way to know which sentences in this pool
-          came from any particular person.
+          <b>None:</b> Only the text of your selected sentences is exported. No
+          identifying information is included.
         </li>
         <li>
-          <b>Anonymous ID:</b> Our application will assign you an anonymous ID
-          (a large random string). All your exported sentences will be
-          associated with this ID. This will help researchers with some kinds of
-          experiments (such as how to improve language model personalization).
+          <b>Anonymous ID:</b> An anonymous random ID is generated and included
+          with your sentences. This allows you to keep track of different export
+          sessions while remaining anonymous.
         </li>
         <li>
-          <b>Anonymous ID + user details:</b> You will be assigned an anonymous
-          ID. Associated with this ID, you can provide additional details about
-          yourself such as:
-          <ul>
-            <li>Age</li>
-            <li>Gender</li>
-            <li>Condition</li>
-            <li>Years of experience with your AAC interface</li>
-            <li>Computer input method</li>
-          </ul>
-          All these fields are optional. These details will help researchers
-          understand the diversity of users and range of interfaces in our data.
+          <b>Anonymous ID + Optional Details:</b> You can optionally include
+          anonymous demographic information such as age range, condition, or
+          years of AAC experience. All fields are optional and anonymous.
         </li>
       </ol>
     </Typography>
 
     <Typography gutterBottom>
-      Your data is encrypted locally on your computer before being saved to a
-      file. This encryption uses a secure encryption key generated by the
-      application. The encrypted file is saved to a location you choose on your
-      computer. You maintain complete control over when and how you share this
-      file with the research team. You can review your exported phrases at any
-      time and choose to re-export with different selections if needed.
+      <b>Important Privacy Note:</b> This tool includes a basic check for
+      personal information (like phone numbers, email addresses, and common
+      names), but it&apos;s not perfect. Please review your phrases carefully
+      before exporting to ensure you&apos;re not including any private
+      information you don&apos;t want in the export file.
+    </Typography>
+
+    <Typography gutterBottom component="span">
+      <b>What you can do with exported data:</b>
+      <ul>
+        <li>Keep it as a personal backup of your AAC communication history</li>
+        <li>
+          Share it with researchers studying AAC interfaces (optional - your
+          choice)
+        </li>
+        <li>Use it to transfer your data between devices</li>
+        <li>Analyze your own communication patterns</li>
+      </ul>
     </Typography>
 
     <Typography gutterBottom>
-      The study team will review any data you choose to share for privacy
-      compromising information before adding it to the public data set. We will
-      honor requests to retroactively remove sentences from the public data, but
-      copies may exist that are outside of our control.
+      <b>Your Rights:</b> You have complete control over this application and
+      your data. You can uninstall it at any time, delete any exported files,
+      and choose never to share your data with anyone. By clicking &quot;Agree
+      and continue&quot;, you acknowledge that you understand how this tool
+      works and that all data stays on your computer unless you choose to share
+      it.
     </Typography>
 
     <Typography gutterBottom>
-      The only known risk to taking part in this research study is that you
-      might accidentally export sentences containing private information. Since
-      you control when and how the encrypted file is shared, you have the
-      opportunity to review your selections before sharing. We believe the risk
-      of private information becoming public is small given how we store and
-      review your data. There are no costs to you for participating in the
-      study. You will not immediately benefit from taking part. However, your
-      efforts may lead to improvements to the interfaces used by you and others.
-    </Typography>
-
-    <Typography gutterBottom>
-      Your participation in this study is voluntary. By clicking &quot;Agree and
-      continue&quot;, you are voluntarily agreeing to take part. You agree that
-      your contributed data may be used in a public data set. You are free to
-      skip any parts of this study without penalty.
-    </Typography>
-
-    <Typography gutterBottom>
-      If you have any questions about this study, please contact Will Wade at
-      will.wade@thinksmartbox.com.
+      If you have questions or feedback about this tool, please contact Will
+      Wade at will.wade@thinksmartbox.com.
     </Typography>
   </Paper>
 );

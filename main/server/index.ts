@@ -5,7 +5,7 @@ import { getDBConnection, deleteDB, Settings, Sentence, App } from "./models";
 import apps, { appFactory } from "./apps";
 import { getSentences } from "./lib/nlp";
 import { EPossibleSources } from "./apps/types";
-import { Connection, In } from "typeorm";
+import { Connection, In, Like, Not } from "typeorm";
 import sodium from "libsodium-wrappers";
 import fs from "fs";
 import { ISentenceDto } from "./lib/api";
@@ -184,32 +184,82 @@ export const registerIPCHandlers = async (): Promise<void> => {
     await refreshDataFromAllApps(connection, { force: true, firstTime: true });
   });
 
-  ipcMain.handle("get-sentence-batch", async (_, size: number) => {
-    const sentences = await sentencesRepo.find({
-      where: {
+  ipcMain.handle(
+    "get-sentence-batch",
+    async (
+      _,
+      {
+        size,
+        searchTerm,
+        searchMode,
+      }: {
+        size: number;
+        searchTerm?: string;
+        searchMode?: "include" | "exclude";
+      }
+    ) => {
+      const where: any = {
         submitted: false,
         viewed: false,
-      },
-      order: {
-        createdAt: "DESC",
-      },
-      take: size,
-    });
+      };
 
-    return sentences;
-  });
+      // Add search filter if provided
+      if (searchTerm && searchTerm.trim() !== "") {
+        if (searchMode === "exclude") {
+          where.content = Not(Like(`%${searchTerm}%`));
+        } else {
+          // Default to include
+          where.content = Like(`%${searchTerm}%`);
+        }
+      }
 
-  ipcMain.handle("get-all-unviewed-sentence-uuids", async () => {
-    const sentences = await sentencesRepo.find({
-      where: {
+      const sentences = await sentencesRepo.find({
+        where,
+        order: {
+          createdAt: "DESC",
+        },
+        take: size,
+      });
+
+      return sentences;
+    }
+  );
+
+  ipcMain.handle(
+    "get-all-unviewed-sentence-uuids",
+    async (
+      _,
+      {
+        searchTerm,
+        searchMode,
+      }: {
+        searchTerm?: string;
+        searchMode?: "include" | "exclude";
+      } = {}
+    ) => {
+      const where: any = {
         submitted: false,
         viewed: false,
-      },
-      select: ["uuid"],
-    });
+      };
 
-    return sentences.map((s) => s.uuid);
-  });
+      // Add search filter if provided
+      if (searchTerm && searchTerm.trim() !== "") {
+        if (searchMode === "exclude") {
+          where.content = Not(Like(`%${searchTerm}%`));
+        } else {
+          // Default to include
+          where.content = Like(`%${searchTerm}%`);
+        }
+      }
+
+      const sentences = await sentencesRepo.find({
+        where,
+        select: ["uuid"],
+      });
+
+      return sentences.map((s) => s.uuid);
+    }
+  );
 
   ipcMain.handle(
     "get-submitted-sentences",

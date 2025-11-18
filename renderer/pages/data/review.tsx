@@ -10,10 +10,19 @@ import CheckBoxOutlineBlankIcon from "@material-ui/icons/CheckBoxOutlineBlank";
 import CheckBoxIcon from "@material-ui/icons/CheckBox";
 import SaveIcon from "@material-ui/icons/Save";
 import SkipNextIcon from "@material-ui/icons/SkipNext";
+import SearchIcon from "@material-ui/icons/Search";
+import ClearIcon from "@material-ui/icons/Clear";
 import Button from "@material-ui/core/Button";
 import Typography from "@material-ui/core/Typography";
 import Select from "@material-ui/core/Select";
 import MenuItem from "@material-ui/core/MenuItem";
+import TextField from "@material-ui/core/TextField";
+import InputAdornment from "@material-ui/core/InputAdornment";
+import IconButton from "@material-ui/core/IconButton";
+import FormControl from "@material-ui/core/FormControl";
+import RadioGroup from "@material-ui/core/RadioGroup";
+import FormControlLabel from "@material-ui/core/FormControlLabel";
+import Radio from "@material-ui/core/Radio";
 import Dialog from "@material-ui/core/Dialog";
 import DialogTitle from "@material-ui/core/DialogTitle";
 import DialogContent from "@material-ui/core/DialogContent";
@@ -50,11 +59,15 @@ const ReviewData = () => {
   const [showSelectAllDialog, setShowSelectAllDialog] = useState(false);
   const [showSelectAllUnreviewedDialog, setShowSelectAllUnreviewedDialog] =
     useState(false);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [searchMode, setSearchMode] = useState<"include" | "exclude">(
+    "include"
+  );
 
-  // Updates batch, stats, and resets checkmarks
+  // Updates batch, stats, but KEEPS checkmarks (persistent selection)
   const refreshSentences = useCallback(async () => {
     const [s, stats] = await Promise.all([
-      getSentenceBatch(batchSize),
+      getSentenceBatch(batchSize, searchTerm, searchMode),
       getStats(),
     ]);
 
@@ -66,14 +79,22 @@ const ReviewData = () => {
     setSentencesLeft(stats.unviewedSentences);
 
     setSentences(s);
-    setIdsToSubmit([]);
-  }, [batchSize]);
+    // Don't reset idsToSubmit - keep selections across pages
+  }, [batchSize, searchTerm, searchMode]);
 
-  // Update batch when size changes
+  // Update batch when size changes or search changes
   useEffect(() => {
     // Also runs upon mount
-    refreshSentences();
-  }, [batchSize]);
+    // Debounce search to avoid too many queries while typing
+    const timeoutId = setTimeout(
+      () => {
+        refreshSentences();
+      },
+      searchTerm ? 500 : 0
+    ); // 500ms debounce for search, immediate for other changes
+
+    return () => clearTimeout(timeoutId);
+  }, [batchSize, searchTerm, searchMode, refreshSentences]);
 
   // Runs upon mount
   // Gets settings
@@ -126,14 +147,24 @@ const ReviewData = () => {
     setError("");
     setSuccess("");
     try {
-      if (idsToSubmit.length > 0) {
-        const filePath = await exportSentencesToFile(idsToSubmit);
-        setSuccess(
-          `Successfully exported ${idsToSubmit.length} phrases to ${filePath}`
-        );
+      if (idsToSubmit.length === 0) {
+        setError("Please select at least one phrase to export.");
+        setIsLoading(false);
+        return;
       }
 
-      await markSentencesAsViewedByUUIDs(sentences.map((s) => s.uuid));
+      const filePath = await exportSentencesToFile(idsToSubmit);
+      setSuccess(
+        `Successfully exported ${idsToSubmit.length} phrases to ${filePath}`
+      );
+
+      // Mark only the exported sentences as viewed
+      await markSentencesAsViewedByUUIDs(idsToSubmit);
+
+      // Clear the exported IDs from selection
+      setIdsToSubmit([]);
+
+      // Refresh to get new sentences
       await refreshSentences();
     } catch (error: unknown) {
       const errorMessage = (error as Error).message;
@@ -151,12 +182,20 @@ const ReviewData = () => {
     }
   };
 
-  const handleSkip = async () => {
+  const handleSkipPage = async () => {
     setIsLoading(true);
     setError("");
     setSuccess("");
     try {
+      // Mark current page as viewed and move to next
       await markSentencesAsViewedByUUIDs(sentences.map((s) => s.uuid));
+
+      // Remove skipped sentences from selection
+      const skippedIds = sentences.map((s) => s.uuid);
+      setIdsToSubmit((current) =>
+        current.filter((id) => !skippedIds.includes(id))
+      );
+
       await refreshSentences();
     } catch (error: unknown) {
       setError(
@@ -167,6 +206,11 @@ const ReviewData = () => {
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const handleNextPage = async () => {
+    // Just move to next page without marking as viewed
+    await refreshSentences();
   };
 
   const handleSelectAll = () => {
@@ -194,7 +238,10 @@ const ReviewData = () => {
     setSuccess("");
 
     try {
-      const allUnviewedUUIDs = await getAllUnviewedSentenceUUIDs();
+      const allUnviewedUUIDs = await getAllUnviewedSentenceUUIDs(
+        searchTerm,
+        searchMode
+      );
 
       if (allUnviewedUUIDs.length === 0) {
         setSuccess("No unreviewed phrases to export.");
@@ -236,6 +283,63 @@ const ReviewData = () => {
     <Grid container spacing={5}>
       <Grid item xs={12}>
         <Typography variant="h2">Review sentences</Typography>
+      </Grid>
+
+      <Grid item xs={12}>
+        <Paper elevation={1}>
+          <Box p={2}>
+            <Grid container spacing={2} alignItems="center">
+              <Grid item xs={12} sm={6}>
+                <TextField
+                  fullWidth
+                  label="Search phrases"
+                  placeholder="Enter search term..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  InputProps={{
+                    startAdornment: (
+                      <InputAdornment position="start">
+                        <SearchIcon />
+                      </InputAdornment>
+                    ),
+                    endAdornment: searchTerm && (
+                      <InputAdornment position="end">
+                        <IconButton
+                          size="small"
+                          onClick={() => setSearchTerm("")}
+                        >
+                          <ClearIcon />
+                        </IconButton>
+                      </InputAdornment>
+                    ),
+                  }}
+                />
+              </Grid>
+              <Grid item xs={12} sm={6}>
+                <FormControl component="fieldset">
+                  <RadioGroup
+                    row
+                    value={searchMode}
+                    onChange={(e) =>
+                      setSearchMode(e.target.value as "include" | "exclude")
+                    }
+                  >
+                    <FormControlLabel
+                      value="include"
+                      control={<Radio color="primary" />}
+                      label="Include matching"
+                    />
+                    <FormControlLabel
+                      value="exclude"
+                      control={<Radio color="secondary" />}
+                      label="Exclude matching"
+                    />
+                  </RadioGroup>
+                </FormControl>
+              </Grid>
+            </Grid>
+          </Box>
+        </Paper>
       </Grid>
 
       {error !== "" && (
@@ -301,7 +405,9 @@ const ReviewData = () => {
                       }
                       onClick={() => handleSendToggle(sentence.uuid)}
                     >
-                      Export
+                      {idsToSubmit.includes(sentence.uuid)
+                        ? "Selected"
+                        : "Select"}
                     </Button>
                   </Grid>
 
@@ -330,7 +436,8 @@ const ReviewData = () => {
             variant="contained"
             onClick={handleExport}
           >
-            Export {idsToSubmit.length > 0 && `(${idsToSubmit.length})`}
+            Export Selected{" "}
+            {idsToSubmit.length > 0 && `(${idsToSubmit.length})`}
           </Button>
         </Grid>
 
@@ -338,11 +445,22 @@ const ReviewData = () => {
           <Button
             disabled={isLoading}
             startIcon={<SkipNextIcon />}
+            color="default"
+            variant="outlined"
+            onClick={handleNextPage}
+          >
+            Next Page
+          </Button>
+        </Grid>
+
+        <Grid item>
+          <Button
+            disabled={isLoading}
             color="secondary"
             variant="outlined"
-            onClick={handleSkip}
+            onClick={handleSkipPage}
           >
-            Skip and move to next
+            Skip Page & Next
           </Button>
         </Grid>
 

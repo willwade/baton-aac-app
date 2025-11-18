@@ -24,12 +24,26 @@ export const importFromInstalledApps = async () => {
   return ipcRenderer.invoke("import-from-installed-apps");
 };
 
-export const getSentenceBatch = async (size: number): Promise<ISentence[]> => {
-  return ipcRenderer.invoke("get-sentence-batch", size);
+export const getSentenceBatch = async (
+  size: number,
+  searchTerm?: string,
+  searchMode?: "include" | "exclude"
+): Promise<ISentence[]> => {
+  return ipcRenderer.invoke("get-sentence-batch", {
+    size,
+    searchTerm,
+    searchMode,
+  });
 };
 
-export const getAllUnviewedSentenceUUIDs = async (): Promise<string[]> => {
-  return ipcRenderer.invoke("get-all-unviewed-sentence-uuids");
+export const getAllUnviewedSentenceUUIDs = async (
+  searchTerm?: string,
+  searchMode?: "include" | "exclude"
+): Promise<string[]> => {
+  return ipcRenderer.invoke("get-all-unviewed-sentence-uuids", {
+    searchTerm,
+    searchMode,
+  });
 };
 
 export const submitSentencesByUUIDs = async (uuids: string[]) => {
