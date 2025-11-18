@@ -37,8 +37,8 @@ const Dashboard = () => {
       {stats && stats.submittedSentences > 0 && (
         <Grid item xs={12}>
           <Typography variant="subtitle1">
-            You have submitted <b>{stats.submittedSentences}</b> sentences,
-            thank you.
+            You have exported <b>{stats.submittedSentences}</b> sentences, thank
+            you.
           </Typography>
         </Grid>
       )}
@@ -86,7 +86,7 @@ const Dashboard = () => {
             startIcon={<Edit />}
             onClick={() => router.push("/data/edit")}
           >
-            Edit submitted sentences
+            Edit exported sentences
           </Button>
         </Grid>
       )}

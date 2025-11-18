@@ -28,8 +28,18 @@ export const getSentenceBatch = async (size: number): Promise<ISentence[]> => {
   return ipcRenderer.invoke("get-sentence-batch", size);
 };
 
+export const getAllUnviewedSentenceUUIDs = async (): Promise<string[]> => {
+  return ipcRenderer.invoke("get-all-unviewed-sentence-uuids");
+};
+
 export const submitSentencesByUUIDs = async (uuids: string[]) => {
   return ipcRenderer.invoke("submit-sentences-by-uuids", { uuids });
+};
+
+export const exportSentencesToFile = async (
+  uuids: string[]
+): Promise<string> => {
+  return ipcRenderer.invoke("export-sentences-to-file", { uuids });
 };
 
 export const markSentencesAsViewedByUUIDs = async (uuids: string[]) => {
@@ -88,14 +98,6 @@ export const getPossibleNewSources = async (): Promise<[EPossibleSources]> => {
   return ipcRenderer.invoke("get-possible-new-sources");
 };
 
-export const uploadUserDetails = async (
-  data: Record<string, unknown>
-): Promise<void> => {
-  ipcRenderer.invoke("upload-user-details", JSON.stringify(data));
-};
-
-export const checkUnlockCode = async (code: string) => {
-  return ipcRenderer.invoke("check-unlock-code", code);
-};
+// Removed uploadUserDetails and checkUnlockCode - not needed for local-only export
 
 export type { ISentence, IStats, ISettings };

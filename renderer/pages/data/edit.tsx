@@ -131,7 +131,7 @@ const EditData = () => {
   return (
     <Grid container spacing={5}>
       <Grid item xs={12} ref={headerRef}>
-        <Typography variant="h2">Edit submitted sentences</Typography>
+        <Typography variant="h2">Edit exported sentences</Typography>
       </Grid>
 
       <Virtuoso

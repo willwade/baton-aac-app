@@ -14,7 +14,6 @@ import {
   FormControl,
 } from "@material-ui/core";
 import { useRouter } from "next/router";
-import { uploadUserDetails } from "../../lib/api";
 
 const ThirdStep = () => {
   const [age, setAge] = useState("");
@@ -27,16 +26,9 @@ const ThirdStep = () => {
   const router = useRouter();
 
   const handleNext = async () => {
-    const data = {
-      age,
-      condition,
-      gender,
-      software,
-      softwareAge,
-      devices,
-    };
-
-    await uploadUserDetails(data);
+    // User details are now stored locally only
+    // No need to upload to backend
+    // TODO: Store these details locally if needed for export metadata
 
     router.push("/setup/4");
   };

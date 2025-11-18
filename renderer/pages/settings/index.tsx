@@ -68,11 +68,13 @@ const SettingsHome = () => {
       <Grid item xs={6}>
         <Typography>
           Please email{" "}
-          <TextLink href="mailto:vertanen@mtu.edu">vertanen@mtu.edu</TextLink>{" "}
+          <TextLink href="mailto:will.wade@thinksmartbox.com">
+            will.wade@thinksmartbox.com
+          </TextLink>{" "}
           with any questions.
           {settings?.includeUUID
-            ? `Your anonymized ID is ${settings?.uuid}.`
-            : "You do not have an anonymized ID associated with your data."}
+            ? ` Your anonymized ID is ${settings?.uuid}.`
+            : " You do not have an anonymized ID associated with your data."}
         </Typography>
       </Grid>
 

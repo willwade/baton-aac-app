@@ -8,16 +8,22 @@ import CheckCircle from "@material-ui/icons/CheckCircle";
 import RadioButtonUncheckedIcon from "@material-ui/icons/RadioButtonUnchecked";
 import CheckBoxOutlineBlankIcon from "@material-ui/icons/CheckBoxOutlineBlank";
 import CheckBoxIcon from "@material-ui/icons/CheckBox";
-import CloudUploadIcon from "@material-ui/icons/CloudUpload";
+import SaveIcon from "@material-ui/icons/Save";
 import SkipNextIcon from "@material-ui/icons/SkipNext";
 import Button from "@material-ui/core/Button";
 import Typography from "@material-ui/core/Typography";
 import Select from "@material-ui/core/Select";
 import MenuItem from "@material-ui/core/MenuItem";
+import Dialog from "@material-ui/core/Dialog";
+import DialogTitle from "@material-ui/core/DialogTitle";
+import DialogContent from "@material-ui/core/DialogContent";
+import DialogContentText from "@material-ui/core/DialogContentText";
+import DialogActions from "@material-ui/core/DialogActions";
 import PIIWarningIcon from "../../components/pii-warning-icon";
 import {
   getSentenceBatch,
-  submitSentencesByUUIDs,
+  getAllUnviewedSentenceUUIDs,
+  exportSentencesToFile,
   markSentencesAsViewedByUUIDs,
   getStats,
   getSettings,
@@ -31,6 +37,7 @@ const PER_PAGE_OPTIONS = [5, 7, 10, 15, 20];
 const ReviewData = () => {
   const router = useRouter();
   const [error, setError] = useState("");
+  const [success, setSuccess] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [selectAllByDefault, setSelectAllByDefault] = useState(false);
   const [batchSize, setBatchSize] = useState(PER_PAGE_OPTIONS[0]);
@@ -40,6 +47,9 @@ const ReviewData = () => {
   const [dangerousSentenceIds, setDangerousSentenceIds] = useState<string[]>(
     []
   );
+  const [showSelectAllDialog, setShowSelectAllDialog] = useState(false);
+  const [showSelectAllUnreviewedDialog, setShowSelectAllUnreviewedDialog] =
+    useState(false);
 
   // Updates batch, stats, and resets checkmarks
   const refreshSentences = useCallback(async () => {
@@ -111,20 +121,46 @@ const ReviewData = () => {
     });
   };
 
-  const handleSubmit = async () => {
+  const handleExport = async () => {
     setIsLoading(true);
+    setError("");
+    setSuccess("");
     try {
       if (idsToSubmit.length > 0) {
-        await submitSentencesByUUIDs(idsToSubmit);
+        const filePath = await exportSentencesToFile(idsToSubmit);
+        setSuccess(
+          `Successfully exported ${idsToSubmit.length} phrases to ${filePath}`
+        );
       }
 
-      await markSentencesAsViewedByUUIDs(sentences.map((s) => s.uuid)),
-        await refreshSentences();
+      await markSentencesAsViewedByUUIDs(sentences.map((s) => s.uuid));
+      await refreshSentences();
+    } catch (error: unknown) {
+      const errorMessage = (error as Error).message;
+      // Don't show error if user cancelled the export dialog
+      if (
+        !errorMessage.includes("Export cancelled") &&
+        !errorMessage.includes("cancelled")
+      ) {
+        setError(
+          `An error occurred. Please try again later. (${errorMessage})`
+        );
+      }
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
-      setError("");
+  const handleSkip = async () => {
+    setIsLoading(true);
+    setError("");
+    setSuccess("");
+    try {
+      await markSentencesAsViewedByUUIDs(sentences.map((s) => s.uuid));
+      await refreshSentences();
     } catch (error: unknown) {
       setError(
-        `An error occured. Please try again later. (${
+        `An error occurred. Please try again later. (${
           (error as Error).message
         })`
       );
@@ -137,7 +173,56 @@ const ReviewData = () => {
     if (areAllSelected) {
       setIdsToSubmit([]);
     } else {
-      setIdsToSubmit(sentences.map((s) => s.uuid));
+      // Show confirmation dialog before selecting all
+      setShowSelectAllDialog(true);
+    }
+  };
+
+  const confirmSelectAll = () => {
+    setIdsToSubmit(sentences.map((s) => s.uuid));
+    setShowSelectAllDialog(false);
+  };
+
+  const handleSelectAllUnreviewed = () => {
+    setShowSelectAllUnreviewedDialog(true);
+  };
+
+  const confirmSelectAllUnreviewed = async () => {
+    setShowSelectAllUnreviewedDialog(false);
+    setIsLoading(true);
+    setError("");
+    setSuccess("");
+
+    try {
+      const allUnviewedUUIDs = await getAllUnviewedSentenceUUIDs();
+
+      if (allUnviewedUUIDs.length === 0) {
+        setSuccess("No unreviewed phrases to export.");
+        setIsLoading(false);
+        return;
+      }
+
+      const filePath = await exportSentencesToFile(allUnviewedUUIDs);
+      setSuccess(
+        `Successfully exported ${allUnviewedUUIDs.length} phrases to ${filePath}`
+      );
+
+      // Mark all as viewed and refresh
+      await markSentencesAsViewedByUUIDs(allUnviewedUUIDs);
+      await refreshSentences();
+    } catch (error: unknown) {
+      const errorMessage = (error as Error).message;
+      // Don't show error if user cancelled the export dialog
+      if (
+        !errorMessage.includes("Export cancelled") &&
+        !errorMessage.includes("cancelled")
+      ) {
+        setError(
+          `An error occurred. Please try again later. (${errorMessage})`
+        );
+      }
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -159,7 +244,13 @@ const ReviewData = () => {
         </Grid>
       )}
 
-      <Grid item container>
+      {success !== "" && (
+        <Grid item>
+          <Alert severity="success">{success}</Alert>
+        </Grid>
+      )}
+
+      <Grid item container spacing={2}>
         <Grid item>
           <Button
             color="primary"
@@ -168,7 +259,18 @@ const ReviewData = () => {
             }
             onClick={handleSelectAll}
           >
-            Select All
+            Select All on Page
+          </Button>
+        </Grid>
+
+        <Grid item>
+          <Button
+            color="secondary"
+            variant="outlined"
+            onClick={handleSelectAllUnreviewed}
+            disabled={isLoading}
+          >
+            Select All Without Reviewing ({sentencesLeft} phrases)
           </Button>
         </Grid>
 
@@ -199,7 +301,7 @@ const ReviewData = () => {
                       }
                       onClick={() => handleSendToggle(sentence.uuid)}
                     >
-                      Send
+                      Export
                     </Button>
                   </Grid>
 
@@ -219,18 +321,28 @@ const ReviewData = () => {
         </Grid>
       ))}
 
-      <Grid item container xs={12}>
+      <Grid item container xs={12} spacing={2}>
+        <Grid item>
+          <Button
+            disabled={isLoading || idsToSubmit.length === 0}
+            startIcon={<SaveIcon />}
+            color="primary"
+            variant="contained"
+            onClick={handleExport}
+          >
+            Export {idsToSubmit.length > 0 && `(${idsToSubmit.length})`}
+          </Button>
+        </Grid>
+
         <Grid item>
           <Button
             disabled={isLoading}
-            startIcon={
-              idsToSubmit.length === 0 ? <SkipNextIcon /> : <CloudUploadIcon />
-            }
+            startIcon={<SkipNextIcon />}
             color="secondary"
-            variant="contained"
-            onClick={handleSubmit}
+            variant="outlined"
+            onClick={handleSkip}
           >
-            {idsToSubmit.length === 0 ? "Skip" : "Submit"} and move to next
+            Skip and move to next
           </Button>
         </Grid>
 
@@ -254,6 +366,78 @@ const ReviewData = () => {
           <Typography>per page</Typography>
         </Grid>
       </Grid>
+
+      <Dialog
+        open={showSelectAllDialog}
+        onClose={() => setShowSelectAllDialog(false)}
+        aria-labelledby="select-all-dialog-title"
+        aria-describedby="select-all-dialog-description"
+      >
+        <DialogTitle id="select-all-dialog-title">
+          Select All Phrases on Page?
+        </DialogTitle>
+        <DialogContent>
+          <DialogContentText id="select-all-dialog-description">
+            Are you sure you want to select all {sentences.length} phrases on
+            this page for export? You can review and deselect individual phrases
+            before exporting.
+          </DialogContentText>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setShowSelectAllDialog(false)} color="primary">
+            Cancel
+          </Button>
+          <Button
+            onClick={confirmSelectAll}
+            color="primary"
+            variant="contained"
+          >
+            Select All
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      <Dialog
+        open={showSelectAllUnreviewedDialog}
+        onClose={() => setShowSelectAllUnreviewedDialog(false)}
+        aria-labelledby="select-all-unreviewed-dialog-title"
+        aria-describedby="select-all-unreviewed-dialog-description"
+      >
+        <DialogTitle id="select-all-unreviewed-dialog-title">
+          Export All Unreviewed Phrases?
+        </DialogTitle>
+        <DialogContent>
+          <DialogContentText id="select-all-unreviewed-dialog-description">
+            <strong>Warning:</strong> This will export ALL {sentencesLeft}{" "}
+            unreviewed phrases without giving you a chance to review them
+            individually.
+            <br />
+            <br />
+            This means you won&apos;t be able to check for:
+            <ul>
+              <li>Personal information (names, addresses, phone numbers)</li>
+              <li>Sensitive content you may not want to share</li>
+              <li>Test phrases or gibberish</li>
+            </ul>
+            Are you sure you want to proceed?
+          </DialogContentText>
+        </DialogContent>
+        <DialogActions>
+          <Button
+            onClick={() => setShowSelectAllUnreviewedDialog(false)}
+            color="primary"
+          >
+            Cancel
+          </Button>
+          <Button
+            onClick={confirmSelectAllUnreviewed}
+            color="secondary"
+            variant="contained"
+          >
+            Yes, Export All Without Reviewing
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Grid>
   );
 };

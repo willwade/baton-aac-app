@@ -1,4 +1,4 @@
-import { ipcMain } from "electron";
+import { ipcMain, dialog } from "electron";
 import { v4 as uuidv4 } from "uuid";
 import chunk from "chunk";
 import { getDBConnection, deleteDB, Settings, Sentence, App } from "./models";
@@ -7,9 +7,9 @@ import { getSentences } from "./lib/nlp";
 import { EPossibleSources } from "./apps/types";
 import { Connection, In } from "typeorm";
 import sodium from "libsodium-wrappers";
-import APIClient, { ISentenceDto } from "./lib/api";
+import fs from "fs";
 
-let SERVER_PUBLIC_KEY: Uint8Array;
+let LOCAL_ENCRYPTION_KEY: Uint8Array;
 
 const getInstalledApps = async () => {
   const installedApps = [];
@@ -127,12 +127,13 @@ export const registerIPCHandlers = async (): Promise<void> => {
   const settingsRepo = connection.manager.getRepository(Settings);
   const appRepo = connection.manager.getRepository(App);
 
-  const api = new APIClient();
+  // Generate local encryption key pair for local-only encryption
+  await sodium.ready;
+  const keyPair = sodium.crypto_box_keypair();
+  LOCAL_ENCRYPTION_KEY = keyPair.publicKey;
 
-  // Get server's public key upon load
-  api.getPublicKey().then((key) => {
-    SERVER_PUBLIC_KEY = Buffer.from(key, "base64");
-  });
+  // Store the private key for potential future decryption (optional)
+  // For now, we'll just use the public key for sealed box encryption
 
   ipcMain.handle("is-first-open", async () => {
     const settings = await connection.manager.findOne(Settings);
@@ -197,6 +198,18 @@ export const registerIPCHandlers = async (): Promise<void> => {
     return sentences;
   });
 
+  ipcMain.handle("get-all-unviewed-sentence-uuids", async () => {
+    const sentences = await sentencesRepo.find({
+      where: {
+        submitted: false,
+        viewed: false,
+      },
+      select: ["uuid"],
+    });
+
+    return sentences.map((s) => s.uuid);
+  });
+
   ipcMain.handle(
     "get-submitted-sentences",
     async (_, { offset, limit }: { offset: number; limit: number }) => {
@@ -216,14 +229,23 @@ export const registerIPCHandlers = async (): Promise<void> => {
   ipcMain.handle(
     "submit-sentences-by-uuids",
     async (_, { uuids }: { uuids: string[] }) => {
+      // Just mark as submitted - no backend upload
+      await connection
+        .createQueryBuilder()
+        .update(Sentence)
+        .where("sentence.uuid IN (:...uuids)", { uuids })
+        .set({ submitted: true })
+        .execute();
+    }
+  );
+
+  ipcMain.handle(
+    "export-sentences-to-file",
+    async (_, { uuids }: { uuids: string[] }) => {
       const settings = await connection.manager.findOne(Settings);
 
       if (!settings) {
         throw new Error("Missing settings");
-      }
-
-      if (!SERVER_PUBLIC_KEY) {
-        throw new Error("Missing server's public key");
       }
 
       // Get sentences
@@ -237,7 +259,7 @@ export const registerIPCHandlers = async (): Promise<void> => {
 
       const encryptedSentences: ISentenceDto[] = sentences.map((s) => {
         const content = Buffer.from(
-          sodium.crypto_box_seal(s.content, SERVER_PUBLIC_KEY)
+          sodium.crypto_box_seal(s.content, LOCAL_ENCRYPTION_KEY)
         );
 
         return {
@@ -247,14 +269,45 @@ export const registerIPCHandlers = async (): Promise<void> => {
         };
       });
 
-      await api.submitSentences(encryptedSentences);
+      // Show save dialog
+      const result = await dialog.showSaveDialog({
+        title: "Export Encrypted Phrases",
+        defaultPath: `baton-export-${
+          new Date().toISOString().split("T")[0]
+        }.json`,
+        filters: [
+          { name: "JSON Files", extensions: ["json"] },
+          { name: "All Files", extensions: ["*"] },
+        ],
+      });
 
+      if (result.canceled || !result.filePath) {
+        throw new Error("Export cancelled");
+      }
+
+      // Write encrypted data to file
+      const exportData = {
+        version: "1.0",
+        exportDate: new Date().toISOString(),
+        sentenceCount: encryptedSentences.length,
+        sentences: encryptedSentences,
+      };
+
+      await fs.promises.writeFile(
+        result.filePath,
+        JSON.stringify(exportData, null, 2),
+        "utf-8"
+      );
+
+      // Mark as submitted after successful export
       await connection
         .createQueryBuilder()
         .update(Sentence)
         .where("sentence.uuid IN (:...uuids)", { uuids })
         .set({ submitted: true })
         .execute();
+
+      return result.filePath;
     }
   );
 
@@ -271,19 +324,16 @@ export const registerIPCHandlers = async (): Promise<void> => {
   );
 
   ipcMain.handle("get-stats", async () => {
-    const [
-      totalSentences,
-      submittedSentences,
-      unviewedSentences,
-    ] = await Promise.all([
-      sentencesRepo.count(),
-      sentencesRepo.count({
-        where: { submitted: true },
-      }),
-      sentencesRepo.count({
-        where: { viewed: false },
-      }),
-    ]);
+    const [totalSentences, submittedSentences, unviewedSentences] =
+      await Promise.all([
+        sentencesRepo.count(),
+        sentencesRepo.count({
+          where: { submitted: true },
+        }),
+        sentencesRepo.count({
+          where: { viewed: false },
+        }),
+      ]);
 
     return { totalSentences, submittedSentences, unviewedSentences };
   });
@@ -291,7 +341,7 @@ export const registerIPCHandlers = async (): Promise<void> => {
   ipcMain.handle(
     "delete-submitted-sentence",
     async (_, { uuid }: { uuid: string }) => {
-      await api.deleteSentence(uuid);
+      // Just mark as not submitted locally - no backend deletion needed
       await sentencesRepo.update(uuid, { submitted: false });
     }
   );
@@ -381,25 +431,6 @@ export const registerIPCHandlers = async (): Promise<void> => {
     return possible;
   });
 
-  ipcMain.handle("upload-user-details", async (_, stringifiedData: string) => {
-    await sodium.ready;
-
-    const encryptedData = Buffer.from(
-      sodium.crypto_box_seal(stringifiedData, SERVER_PUBLIC_KEY)
-    );
-    const settings = await connection.manager.findOne(Settings);
-
-    if (!settings?.uuid) {
-      throw new Error("UUID has not been generated");
-    }
-
-    await api.putUserDetails({
-      uuid: settings.uuid,
-      encryptedData: encryptedData.toString("base64"),
-    });
-  });
-
-  ipcMain.handle("check-unlock-code", async (_, code: string) => {
-    await api.checkUnlockCode(code);
-  });
+  // Removed upload-user-details and check-unlock-code handlers
+  // as we're doing local-only export now
 };

@@ -33,7 +33,7 @@ const SecondStep = () => {
 
       <Grid item xs={8}>
         <Typography gutterBottom>
-          You can also allow us to add an anonymous ID to your uploaded
+          You can also allow us to add an anonymous ID to your exported
           sentences. This will help us to better model the data, and improve our
           research.
         </Typography>
