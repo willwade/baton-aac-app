@@ -8,6 +8,7 @@ import { EPossibleSources } from "./apps/types";
 import { Connection, In } from "typeorm";
 import sodium from "libsodium-wrappers";
 import fs from "fs";
+import { ISentenceDto } from "./lib/api";
 
 let LOCAL_ENCRYPTION_KEY: Uint8Array;
 
