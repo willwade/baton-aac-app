@@ -13,10 +13,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # Using Node 16 because Next.js 10.0.3 doesn't support Node 20
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: "20"
+          node-version: "16"
           cache: "yarn"
 
       - name: Cache Electron

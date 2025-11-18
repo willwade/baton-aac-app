@@ -47,10 +47,11 @@ jobs:
           security import certificate.p12 -k build.keychain -P "" -T /usr/bin/codesign
           security set-key-partition-list -S apple-tool:,apple: -s -k $MACOS_KEYCHAIN_PASSWORD build.keychain
 
+      # Using Node 16 because Next.js 10.0.3 doesn't support Node 20
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: "20"
+          node-version: "16"
           cache: "yarn"
 
       - name: Install dependencies
