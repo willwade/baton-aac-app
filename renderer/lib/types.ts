@@ -26,6 +26,8 @@ export function formatMetadataForDisplay(metadata?: IPhraseMetadata[]): {
   firstSaid?: Date;
   lastSaid?: Date;
   hasGPS: boolean;
+  locations?: Array<{ latitude: number; longitude: number; timestamp: Date }>;
+  mostRecentLocation?: { latitude: number; longitude: number; timestamp: Date };
 } {
   if (!metadata || metadata.length === 0) {
     return { count: 0, hasGPS: false };
@@ -33,14 +35,26 @@ export function formatMetadataForDisplay(metadata?: IPhraseMetadata[]): {
 
   const dates = metadata.map((m) => dotNetTicksToDate(m.timestamp));
   const hasGPS = metadata.some(
-    (m) => m.latitude !== null || m.longitude !== null
+    (m) => m.latitude !== null && m.longitude !== null
   );
+
+  // Extract locations with timestamps
+  const locations = metadata
+    .filter((m) => m.latitude !== null && m.longitude !== null)
+    .map((m) => ({
+      latitude: m.latitude!,
+      longitude: m.longitude!,
+      timestamp: dotNetTicksToDate(m.timestamp),
+    }))
+    .sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime()); // Most recent first
 
   return {
     count: metadata.length,
     firstSaid: new Date(Math.min(...dates.map((d) => d.getTime()))),
     lastSaid: new Date(Math.max(...dates.map((d) => d.getTime()))),
     hasGPS,
+    locations: locations.length > 0 ? locations : undefined,
+    mostRecentLocation: locations.length > 0 ? locations[0] : undefined,
   };
 }
 

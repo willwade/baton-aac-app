@@ -497,30 +497,40 @@ const ReviewData = () => {
                             );
                             const parts = [];
 
+                            // Time information
                             if (meta.count > 1) {
                               parts.push(`Said ${meta.count} times`);
                             } else {
                               parts.push("Said once");
                             }
 
-                            if (meta.firstSaid) {
-                              parts.push(
-                                `First: ${meta.firstSaid.toLocaleDateString()}`
+                            // Most recent time with subtle formatting
+                            if (meta.lastSaid) {
+                              const timeStr = meta.lastSaid.toLocaleString(
+                                undefined,
+                                {
+                                  month: "short",
+                                  day: "numeric",
+                                  hour: "2-digit",
+                                  minute: "2-digit",
+                                }
                               );
+                              parts.push(`🕐 ${timeStr}`);
                             }
 
-                            if (meta.lastSaid && meta.count > 1) {
-                              parts.push(
-                                `Last: ${meta.lastSaid.toLocaleDateString()}`
-                              );
+                            // Location information (most recent)
+                            if (meta.mostRecentLocation) {
+                              const { latitude, longitude } =
+                                meta.mostRecentLocation;
+                              // Format coordinates to 4 decimal places for subtlety
+                              const latStr = latitude.toFixed(4);
+                              const lonStr = longitude.toFixed(4);
+                              parts.push(`📍 ${latStr}, ${lonStr}`);
                             }
 
-                            if (meta.hasGPS) {
-                              parts.push("📍 GPS data available");
-                            }
-
+                            // Source app
                             if (sentence.source) {
-                              parts.push(`Source: ${sentence.source}`);
+                              parts.push(`${sentence.source}`);
                             }
 
                             return parts.join(" • ");
