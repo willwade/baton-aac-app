@@ -9,6 +9,19 @@ interface DatabaseRow {
   Text: string;
 }
 
+interface PhraseHistoryRow {
+  Text: string;
+  Timestamp: number;
+  Latitude: number | null;
+  Longitude: number | null;
+}
+
+export interface GridPhraseMetadata {
+  timestamp: number; // .NET ticks
+  latitude: number | null;
+  longitude: number | null;
+}
+
 class Grid extends AAppDataGetters {
   private name: EPossibleSources = EPossibleSources.Grid;
   private staticLocations: string[];
@@ -153,6 +166,32 @@ class Grid extends AAppDataGetters {
   }
 
   /**
+   * Get phrases with metadata (timestamps, GPS coordinates)
+   * Returns a map of phrase content to array of metadata (one per occurrence)
+   */
+  async getPhrasesWithMetadata(): Promise<Map<string, GridPhraseMetadata[]>> {
+    const locations = await this.getLocations();
+
+    const allPhraseData = await Promise.all(
+      locations.map(
+        async (location) => await this.getMetadataForLocation(location)
+      )
+    );
+
+    // Combine all locations into a single map
+    const combinedMap = new Map<string, GridPhraseMetadata[]>();
+
+    for (const locationMap of allPhraseData) {
+      for (const [phrase, metadata] of locationMap.entries()) {
+        const existing = combinedMap.get(phrase) || [];
+        combinedMap.set(phrase, [...existing, ...metadata]);
+      }
+    }
+
+    return combinedMap;
+  }
+
+  /**
    * Queries the sqlite database given.
    *
    * Selects all the phrases in the PhraseHistory table.
@@ -185,6 +224,52 @@ class Grid extends AAppDataGetters {
     const phrases = databaseResult.map((result) => result.Text);
 
     return phrases;
+  }
+
+  /**
+   * Get metadata for all phrases at a specific location
+   * Returns a map of phrase content to array of metadata
+   */
+  private async getMetadataForLocation(
+    location: string
+  ): Promise<Map<string, GridPhraseMetadata[]>> {
+    const database = new sqlite3.Database(location);
+
+    const databaseResult = (await new Promise((resolve, reject) => {
+      database.all(
+        `
+        SELECT p.Text, ph.Timestamp, ph.Latitude, ph.Longitude
+        FROM PhraseHistory ph
+        INNER JOIN Phrases p ON p.Id = ph.PhraseId
+        WHERE ph.Timestamp <> 0
+        ORDER BY ph.Timestamp ASC
+      `,
+        (err, result) => {
+          if (err) return reject(err);
+
+          resolve(result);
+        }
+      );
+    })) as Array<PhraseHistoryRow>;
+
+    database.close();
+
+    // Group by phrase text
+    const phraseMap = new Map<string, GridPhraseMetadata[]>();
+
+    for (const row of databaseResult) {
+      const phrase = addEndMarkerToPhrase(row.Text);
+      const metadata: GridPhraseMetadata = {
+        timestamp: row.Timestamp,
+        latitude: row.Latitude,
+        longitude: row.Longitude,
+      };
+
+      const existing = phraseMap.get(phrase) || [];
+      phraseMap.set(phrase, [...existing, metadata]);
+    }
+
+    return phraseMap;
   }
 
   getName() {

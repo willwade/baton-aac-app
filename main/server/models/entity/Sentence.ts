@@ -17,4 +17,13 @@ export class Sentence {
   @Index()
   @Column()
   content!: string;
+
+  // Metadata fields (JSON stored as text)
+  // Array of {timestamp, latitude, longitude} for each occurrence
+  @Column({ type: "text", nullable: true })
+  metadata?: string;
+
+  // Source app name (Grid, Dasher, etc.)
+  @Column({ nullable: true })
+  source?: string;
 }

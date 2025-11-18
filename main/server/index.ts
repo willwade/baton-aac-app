@@ -8,7 +8,11 @@ import { EPossibleSources } from "./apps/types";
 import { Connection, In, Like, Not } from "typeorm";
 import sodium from "libsodium-wrappers";
 import fs from "fs";
-import { ISentenceDto } from "./lib/api";
+import {
+  ISentenceDto,
+  convertMetadataForExport,
+  dotNetTicksToDate,
+} from "./lib/api";
 
 let LOCAL_ENCRYPTION_KEY: Uint8Array;
 
@@ -51,6 +55,18 @@ const refreshDataFromAllApps = async (
           // Update
           const text = await thisApp.getText();
 
+          // Check if this is a Grid app with metadata support
+          const isGridApp = appModel.name === "Grid";
+          let metadataMap: Map<string, any[]> | undefined;
+
+          if (isGridApp && "getPhrasesWithMetadata" in thisApp) {
+            try {
+              metadataMap = await (thisApp as any).getPhrasesWithMetadata();
+            } catch (error) {
+              console.error("Failed to get Grid metadata:", error);
+            }
+          }
+
           if (firstTime) {
             let sentencesInChunks = chunk(getSentences(text), 50);
 
@@ -65,13 +81,18 @@ const refreshDataFromAllApps = async (
                 .insert()
                 .into(Sentence)
                 .values(
-                  chunk.map((s) => ({
-                    uuid: uuidv4(),
-                    createdAt: new Date(),
-                    submitted: false,
-                    viewed: false,
-                    content: s,
-                  }))
+                  chunk.map((s) => {
+                    const metadata = metadataMap?.get(s);
+                    return {
+                      uuid: uuidv4(),
+                      createdAt: new Date(),
+                      submitted: false,
+                      viewed: false,
+                      content: s,
+                      source: appModel.name,
+                      metadata: metadata ? JSON.stringify(metadata) : undefined,
+                    };
+                  })
                 )
                 .execute();
             }
@@ -100,12 +121,15 @@ const refreshDataFromAllApps = async (
                 seenDuplicateSentences++;
                 continue;
               } else {
+                const metadata = metadataMap?.get(sentence);
                 const s = sentencesRepo.create({
                   uuid: uuidv4(),
                   createdAt: new Date(),
                   submitted: false,
                   viewed: false,
                   content: sentence,
+                  source: appModel.name,
+                  metadata: metadata ? JSON.stringify(metadata) : undefined,
                 });
 
                 await sentencesRepo.save(s);
@@ -151,6 +175,7 @@ export const registerIPCHandlers = async (): Promise<void> => {
         uuid: uuidv4(),
         sentencesPerPage: 5,
         defaultToAllSelected: false,
+        includeMetadata: false,
       });
 
       await settingsRepo.save(settings);
@@ -192,10 +217,14 @@ export const registerIPCHandlers = async (): Promise<void> => {
         size,
         searchTerm,
         searchMode,
+        startDate,
+        endDate,
       }: {
         size: number;
         searchTerm?: string;
         searchMode?: "include" | "exclude";
+        startDate?: string; // ISO date string
+        endDate?: string; // ISO date string
       }
     ) => {
       const where: any = {
@@ -213,15 +242,38 @@ export const registerIPCHandlers = async (): Promise<void> => {
         }
       }
 
-      const sentences = await sentencesRepo.find({
+      let sentences = await sentencesRepo.find({
         where,
         order: {
           createdAt: "DESC",
         },
-        take: size,
+        take: size * 10, // Get more to filter by date
       });
 
-      return sentences;
+      // Filter by date range if provided (metadata-based filtering)
+      if (startDate || endDate) {
+        const start = startDate ? new Date(startDate) : null;
+        const end = endDate ? new Date(endDate) : null;
+
+        sentences = sentences.filter((s) => {
+          if (!s.metadata) return false;
+
+          try {
+            const metadata = JSON.parse(s.metadata);
+            return metadata.some((m: any) => {
+              const date = dotNetTicksToDate(m.timestamp);
+              if (start && date < start) return false;
+              if (end && date > end) return false;
+              return true;
+            });
+          } catch {
+            return false;
+          }
+        });
+      }
+
+      // Limit to requested size after filtering
+      return sentences.slice(0, size);
     }
   );
 
@@ -232,9 +284,13 @@ export const registerIPCHandlers = async (): Promise<void> => {
       {
         searchTerm,
         searchMode,
+        startDate,
+        endDate,
       }: {
         searchTerm?: string;
         searchMode?: "include" | "exclude";
+        startDate?: string;
+        endDate?: string;
       } = {}
     ) => {
       const where: any = {
@@ -252,10 +308,32 @@ export const registerIPCHandlers = async (): Promise<void> => {
         }
       }
 
-      const sentences = await sentencesRepo.find({
+      let sentences = await sentencesRepo.find({
         where,
-        select: ["uuid"],
+        select: ["uuid", "metadata"],
       });
+
+      // Filter by date range if provided
+      if (startDate || endDate) {
+        const start = startDate ? new Date(startDate) : null;
+        const end = endDate ? new Date(endDate) : null;
+
+        sentences = sentences.filter((s) => {
+          if (!s.metadata) return false;
+
+          try {
+            const metadata = JSON.parse(s.metadata);
+            return metadata.some((m: any) => {
+              const date = dotNetTicksToDate(m.timestamp);
+              if (start && date < start) return false;
+              if (end && date > end) return false;
+              return true;
+            });
+          } catch {
+            return false;
+          }
+        });
+      }
 
       return sentences.map((s) => s.uuid);
     }
@@ -313,11 +391,29 @@ export const registerIPCHandlers = async (): Promise<void> => {
           sodium.crypto_box_seal(s.content, LOCAL_ENCRYPTION_KEY)
         );
 
-        return {
+        const dto: ISentenceDto = {
           uuid: s.uuid,
           anonymousUUID: settings.includeUUID ? settings.uuid : null,
           content: content.toString("base64"),
         };
+
+        // Include metadata if setting is enabled and metadata exists
+        if (settings.includeMetadata && s.metadata) {
+          try {
+            const parsedMetadata = JSON.parse(s.metadata);
+            // Convert .NET ticks to ISO date strings
+            dto.metadata = convertMetadataForExport(parsedMetadata);
+          } catch (error) {
+            console.error("Failed to parse metadata for sentence:", s.uuid);
+          }
+        }
+
+        // Include source if metadata is enabled
+        if (settings.includeMetadata && s.source) {
+          dto.source = s.source;
+        }
+
+        return dto;
       });
 
       // Show save dialog

@@ -27,22 +27,30 @@ export const importFromInstalledApps = async () => {
 export const getSentenceBatch = async (
   size: number,
   searchTerm?: string,
-  searchMode?: "include" | "exclude"
+  searchMode?: "include" | "exclude",
+  startDate?: string,
+  endDate?: string
 ): Promise<ISentence[]> => {
   return ipcRenderer.invoke("get-sentence-batch", {
     size,
     searchTerm,
     searchMode,
+    startDate,
+    endDate,
   });
 };
 
 export const getAllUnviewedSentenceUUIDs = async (
   searchTerm?: string,
-  searchMode?: "include" | "exclude"
+  searchMode?: "include" | "exclude",
+  startDate?: string,
+  endDate?: string
 ): Promise<string[]> => {
   return ipcRenderer.invoke("get-all-unviewed-sentence-uuids", {
     searchTerm,
     searchMode,
+    startDate,
+    endDate,
   });
 };
 

@@ -16,4 +16,7 @@ export class Settings {
 
   @Column()
   sentencesPerPage!: number;
+
+  @Column({ default: false })
+  includeMetadata!: boolean;
 }

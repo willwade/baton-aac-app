@@ -59,6 +59,15 @@ const SettingsHome = () => {
     await refreshSettings();
   };
 
+  const handleToggleMetadata = async () => {
+    if (!settings) {
+      return;
+    }
+
+    await putSettings({ includeMetadata: !settings.includeMetadata });
+    await refreshSettings();
+  };
+
   return (
     <Grid container spacing={1}>
       <Grid item xs={12}>
@@ -99,6 +108,33 @@ const SettingsHome = () => {
         >
           Delete all locally stored data
         </Button>
+      </Grid>
+
+      <Grid item xs={12}>
+        <Typography variant="h5">Export Options</Typography>
+      </Grid>
+
+      <Grid item xs={12}>
+        <Button
+          onClick={handleToggleMetadata}
+          startIcon={
+            settings?.includeMetadata ? (
+              <CheckCircle />
+            ) : (
+              <RadioButtonUncheckedIcon />
+            )
+          }
+        >
+          Include metadata in exports (timestamps, GPS coordinates)
+        </Button>
+      </Grid>
+
+      <Grid item xs={12}>
+        <Typography variant="body2" color="textSecondary">
+          When enabled, exported files will include timestamps and GPS
+          coordinates (if available) for each phrase. This data comes from Grid
+          3 and other AAC apps that track when and where phrases were spoken.
+        </Typography>
       </Grid>
 
       <Grid item xs={12}>

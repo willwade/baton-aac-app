@@ -40,6 +40,7 @@ import {
   putSettings,
 } from "../../lib/api";
 import { doesContainPersonalInformation } from "../../lib/pii";
+import { formatMetadataForDisplay } from "../../lib/types";
 
 const PER_PAGE_OPTIONS = [5, 7, 10, 15, 20];
 
@@ -63,15 +64,25 @@ const ReviewData = () => {
   const [searchMode, setSearchMode] = useState<"include" | "exclude">(
     "include"
   );
+  const [startDate, setStartDate] = useState("");
+  const [endDate, setEndDate] = useState("");
 
   // Updates batch, stats, but KEEPS checkmarks (persistent selection)
   const refreshSentences = useCallback(async () => {
     const [s, stats] = await Promise.all([
-      getSentenceBatch(batchSize, searchTerm, searchMode),
+      getSentenceBatch(batchSize, searchTerm, searchMode, startDate, endDate),
       getStats(),
     ]);
 
     if (s.length === 0) {
+      // If date filtering is active and no results, show a message instead of redirecting
+      if (startDate || endDate) {
+        setError(
+          "No phrases found in the selected date range. Note: Date filtering only works with phrases that have metadata (e.g., from Grid 3)."
+        );
+        setSentences([]);
+        return;
+      }
       router.push("/dashboard");
       return;
     }
@@ -80,7 +91,7 @@ const ReviewData = () => {
 
     setSentences(s);
     // Don't reset idsToSubmit - keep selections across pages
-  }, [batchSize, searchTerm, searchMode]);
+  }, [batchSize, searchTerm, searchMode, startDate, endDate]);
 
   // Update batch when size changes or search changes
   useEffect(() => {
@@ -94,7 +105,7 @@ const ReviewData = () => {
     ); // 500ms debounce for search, immediate for other changes
 
     return () => clearTimeout(timeoutId);
-  }, [batchSize, searchTerm, searchMode, refreshSentences]);
+  }, [batchSize, searchTerm, searchMode, startDate, endDate, refreshSentences]);
 
   // Runs upon mount
   // Gets settings
@@ -240,7 +251,9 @@ const ReviewData = () => {
     try {
       const allUnviewedUUIDs = await getAllUnviewedSentenceUUIDs(
         searchTerm,
-        searchMode
+        searchMode,
+        startDate,
+        endDate
       );
 
       if (allUnviewedUUIDs.length === 0) {
@@ -337,6 +350,68 @@ const ReviewData = () => {
                   </RadioGroup>
                 </FormControl>
               </Grid>
+              <Grid item xs={12} sm={6}>
+                <TextField
+                  fullWidth
+                  type="date"
+                  label="Start Date"
+                  value={startDate}
+                  onChange={(e) => setStartDate(e.target.value)}
+                  InputLabelProps={{ shrink: true }}
+                  InputProps={{
+                    endAdornment: startDate && (
+                      <InputAdornment position="end">
+                        <IconButton
+                          size="small"
+                          onClick={() => setStartDate("")}
+                        >
+                          <ClearIcon />
+                        </IconButton>
+                      </InputAdornment>
+                    ),
+                  }}
+                />
+              </Grid>
+              <Grid item xs={12} sm={6}>
+                <TextField
+                  fullWidth
+                  type="date"
+                  label="End Date"
+                  value={endDate}
+                  onChange={(e) => setEndDate(e.target.value)}
+                  InputLabelProps={{ shrink: true }}
+                  InputProps={{
+                    endAdornment: endDate && (
+                      <InputAdornment position="end">
+                        <IconButton size="small" onClick={() => setEndDate("")}>
+                          <ClearIcon />
+                        </IconButton>
+                      </InputAdornment>
+                    ),
+                  }}
+                />
+              </Grid>
+              {(startDate || endDate) && (
+                <Grid item xs={12}>
+                  <Typography variant="caption" color="textSecondary">
+                    📅 Filtering by date range (based on when phrases were
+                    spoken)
+                    {!startDate &&
+                      " - showing all phrases before " +
+                        new Date(endDate).toLocaleDateString()}
+                    {!endDate &&
+                      startDate &&
+                      " - showing all phrases after " +
+                        new Date(startDate).toLocaleDateString()}
+                    {startDate &&
+                      endDate &&
+                      " - showing phrases between " +
+                        new Date(startDate).toLocaleDateString() +
+                        " and " +
+                        new Date(endDate).toLocaleDateString()}
+                  </Typography>
+                </Grid>
+              )}
             </Grid>
           </Box>
         </Paper>
@@ -413,6 +488,46 @@ const ReviewData = () => {
 
                   <Grid item xs={10}>
                     <Typography variant="body1">{sentence.content}</Typography>
+                    {sentence.metadata && sentence.metadata.length > 0 && (
+                      <Box mt={0.5}>
+                        <Typography variant="caption" color="textSecondary">
+                          {(() => {
+                            const meta = formatMetadataForDisplay(
+                              sentence.metadata
+                            );
+                            const parts = [];
+
+                            if (meta.count > 1) {
+                              parts.push(`Said ${meta.count} times`);
+                            } else {
+                              parts.push("Said once");
+                            }
+
+                            if (meta.firstSaid) {
+                              parts.push(
+                                `First: ${meta.firstSaid.toLocaleDateString()}`
+                              );
+                            }
+
+                            if (meta.lastSaid && meta.count > 1) {
+                              parts.push(
+                                `Last: ${meta.lastSaid.toLocaleDateString()}`
+                              );
+                            }
+
+                            if (meta.hasGPS) {
+                              parts.push("📍 GPS data available");
+                            }
+
+                            if (sentence.source) {
+                              parts.push(`Source: ${sentence.source}`);
+                            }
+
+                            return parts.join(" • ");
+                          })()}
+                        </Typography>
+                      </Box>
+                    )}
                   </Grid>
 
                   {dangerousSentenceIds.includes(sentence.uuid) && (
