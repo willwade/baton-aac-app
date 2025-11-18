@@ -15,21 +15,21 @@ jobs:
       ELECTRON_BUILDER_CACHE: ${{ github.workspace }}/.cache/electron-builder
 
     steps:
-      - uses: actions/checkout@v1
+      - uses: actions/checkout@v4
 
       - name: Cache Electron
-        uses: actions/cache@v1
+        uses: actions/cache@v4
         with:
           path: ${{ github.workspace }}/.cache/electron
-          key: ${{ runner.os }}-electron-cache-${{ hashFiles(format('{0}{1}', github.workspace, '/yarn.lock')) }}
+          key: ${{ runner.os }}-electron-cache-${{ hashFiles('**/yarn.lock') }}
           restore-keys: |
             ${{ runner.os }}-electron-cache-
 
       - name: Cache Electron-Builder
-        uses: actions/cache@v1
+        uses: actions/cache@v4
         with:
           path: ${{ github.workspace }}/.cache/electron-builder
-          key: ${{ runner.os }}-electron-builder-cache-${{ hashFiles(format('{0}{1}', github.workspace, '/yarn.lock')) }}
+          key: ${{ runner.os }}-electron-builder-cache-${{ hashFiles('**/yarn.lock') }}
           restore-keys: |
             ${{ runner.os }}-electron-builder-cache-
 
@@ -47,8 +47,14 @@ jobs:
           security import certificate.p12 -k build.keychain -P "" -T /usr/bin/codesign
           security set-key-partition-list -S apple-tool:,apple: -s -k $MACOS_KEYCHAIN_PASSWORD build.keychain
 
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "yarn"
+
       - name: Install dependencies
-        uses: bahmutov/npm-install@v1
+        run: yarn install --frozen-lockfile
 
       - name: Add environment variables
         shell: bash
