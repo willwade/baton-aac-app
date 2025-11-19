@@ -15,6 +15,8 @@ import {
 } from "./lib/api";
 
 let LOCAL_ENCRYPTION_KEY: Uint8Array;
+const EXPORT_ENCRYPTION_DISABLED =
+  process.env.BATON_DISABLE_EXPORT_ENCRYPTION === "true";
 
 const getInstalledApps = async () => {
   const installedApps = [];
@@ -273,7 +275,26 @@ export const registerIPCHandlers = async (): Promise<void> => {
       }
 
       // Limit to requested size after filtering
-      return sentences.slice(0, size);
+      const limitedSentences = sentences.slice(0, size);
+
+      // Parse metadata JSON strings to objects for frontend
+      return limitedSentences.map((s) => {
+        if (s.metadata) {
+          try {
+            return {
+              ...s,
+              metadata: JSON.parse(s.metadata),
+            };
+          } catch {
+            // If parsing fails, return without metadata
+            return {
+              ...s,
+              metadata: undefined,
+            };
+          }
+        }
+        return s;
+      });
     }
   );
 
@@ -387,14 +408,14 @@ export const registerIPCHandlers = async (): Promise<void> => {
       await sodium.ready;
 
       const encryptedSentences: ISentenceDto[] = sentences.map((s) => {
-        const content = Buffer.from(
-          sodium.crypto_box_seal(s.content, LOCAL_ENCRYPTION_KEY)
-        );
-
         const dto: ISentenceDto = {
           uuid: s.uuid,
           anonymousUUID: settings.includeUUID ? settings.uuid : null,
-          content: content.toString("base64"),
+          content: EXPORT_ENCRYPTION_DISABLED
+            ? s.content
+            : Buffer.from(
+                sodium.crypto_box_seal(s.content, LOCAL_ENCRYPTION_KEY)
+              ).toString("base64"),
         };
 
         // Include metadata if setting is enabled and metadata exists
@@ -436,6 +457,9 @@ export const registerIPCHandlers = async (): Promise<void> => {
       const exportData = {
         version: "1.0",
         exportDate: new Date().toISOString(),
+        encryption: EXPORT_ENCRYPTION_DISABLED
+          ? "none"
+          : "libsodium-sealed-box+base64",
         sentenceCount: encryptedSentences.length,
         sentences: encryptedSentences,
       };

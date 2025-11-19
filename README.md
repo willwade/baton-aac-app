@@ -40,3 +40,7 @@ To build new releases:
 4. The GitHub Actions workflow will automatically build and upload the installers to the draft release
 5. Once ready, publish the draft release
 
+### Developer Option: Plain Text Exports
+
+Exports are encrypted by default. Developers can opt-in to plain text exports by setting the `BATON_DISABLE_EXPORT_ENCRYPTION=true` environment variable (for example in your `.env`). Only use this flag locally—regular builds should keep encryption enabled.
+
