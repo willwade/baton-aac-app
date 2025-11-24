@@ -5,7 +5,6 @@ import PlainText from "./plain-text";
 import Grid from "./grid";
 import Communicator from "./communicator";
 import { AAppDataGetters, EPossibleSources } from "./types";
-import { addEndMarkerToPhrase } from "../lib/add-end-marker-to-phrase";
 import { processPredictableFile } from "./predictable";
 
 const DASHER_PATHS = [
@@ -66,9 +65,8 @@ export const appFactory = ({
           return buff
             .toString()
             .split("\n")
-            .map((phrase) => addEndMarkerToPhrase(phrase.trim()))
-            .join(" ")
-            .replace(/\.\./g, ".");
+            .map((phrase) => phrase.trim())
+            .join(" ");
         },
       });
     case EPossibleSources.Communicator:

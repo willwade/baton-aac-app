@@ -1,5 +1,4 @@
 import fs from "fs";
-import { addEndMarkerToPhrase } from "../lib/add-end-marker-to-phrase";
 import { getHashFromFile } from "../lib/hash";
 import { AAppDataGetters, EPossibleSources } from "./types";
 
@@ -52,7 +51,7 @@ class Communicator extends AAppDataGetters {
       fileOffsetBytes += 4;
     }
 
-    return phrases.map((phrase) => addEndMarkerToPhrase(phrase)).join("\n");
+    return phrases.join("\n");
   }
 
   getName() {

@@ -3,7 +3,6 @@ import sqlite3 from "sqlite3";
 import path from "path";
 import { getHashFromFile, hashString } from "../lib/hash";
 import { AAppDataGetters, EPossibleSources } from "./types";
-import { addEndMarkerToPhrase } from "../lib/add-end-marker-to-phrase";
 
 interface DatabaseRow {
   Text: string;
@@ -182,8 +181,7 @@ class Grid extends AAppDataGetters {
     const sentences = phrases
       .flat()
       // Split multi-line phrases into separate phrases (in case any exist)
-      .flatMap((phrase) => phrase.split(/\n/).filter((p) => p.trim() !== ""))
-      .map((phrase) => addEndMarkerToPhrase(phrase));
+      .flatMap((phrase) => phrase.split(/\n/).filter((p) => p.trim() !== ""));
 
     const rawPhrases = sentences.join("\n");
 
@@ -295,17 +293,15 @@ class Grid extends AAppDataGetters {
       const lines = text.split(/\n/).filter((p) => p.trim() !== "");
 
       for (const line of lines) {
-        // Process phrase the same way as getText() does:
-        // Add end marker
-        const phrase = addEndMarkerToPhrase(line);
+        // Use the exact phrase as-is (no end marker added)
         const metadata: GridPhraseMetadata = {
           timestamp: row.Timestamp,
           latitude: row.Latitude,
           longitude: row.Longitude,
         };
 
-        const existing = phraseMap.get(phrase) || [];
-        phraseMap.set(phrase, [...existing, metadata]);
+        const existing = phraseMap.get(line) || [];
+        phraseMap.set(line, [...existing, metadata]);
       }
     }
 
