@@ -70,11 +70,15 @@ const refreshDataFromAllApps = async (
           }
 
           if (firstTime) {
-            let sentencesInChunks = chunk(getSentences(text), 50);
-
-            sentencesInChunks = sentencesInChunks.map((chunk) =>
-              chunk.filter((s) => s.trim() !== "")
+            // Get all sentences and deduplicate them
+            const allSentences = getSentences(text).filter(
+              (s) => s.trim() !== ""
             );
+
+            // Deduplicate: keep only unique phrases
+            const uniqueSentences = Array.from(new Set(allSentences));
+
+            const sentencesInChunks = chunk(uniqueSentences, 50);
 
             // Can't use Promise.all, since insert order (therefore createdAt date) would be non-deterministic
             for (const chunk of sentencesInChunks) {

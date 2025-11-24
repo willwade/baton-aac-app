@@ -158,7 +158,9 @@ class Grid extends AAppDataGetters {
 
     const sentences = phrases
       .flat()
-      .map((phrase) => addEndMarkerToPhrase(phrase));
+      .map((phrase) => addEndMarkerToPhrase(phrase))
+      // Replace newlines with spaces to prevent getSentences() from splitting multi-line phrases
+      .map((phrase) => phrase.replace(/\n/g, " "));
 
     const rawPhrases = sentences.join("\n");
 
@@ -194,7 +196,7 @@ class Grid extends AAppDataGetters {
   /**
    * Queries the sqlite database given.
    *
-   * Selects all the phrases in the PhraseHistory table.
+   * Selects all UNIQUE phrases from the PhraseHistory table.
    *
    * Only takes phrases with a real timestamp. For some reason
    * every phrase exists in history once without a timestamp even
@@ -206,7 +208,7 @@ class Grid extends AAppDataGetters {
     const databaseResult = (await new Promise((resolve, reject) => {
       database.all(
         `
-        SELECT Text
+        SELECT DISTINCT p.Text
         FROM PhraseHistory ph
         INNER JOIN Phrases p ON p.Id = ph.PhraseId
         WHERE "Timestamp" <> 0
@@ -258,7 +260,10 @@ class Grid extends AAppDataGetters {
     const phraseMap = new Map<string, GridPhraseMetadata[]>();
 
     for (const row of databaseResult) {
-      const phrase = addEndMarkerToPhrase(row.Text);
+      // Process phrase the same way as getText() does:
+      // 1. Add end marker
+      // 2. Replace newlines with spaces (to match how phrases are stored)
+      const phrase = addEndMarkerToPhrase(row.Text).replace(/\n/g, " ");
       const metadata: GridPhraseMetadata = {
         timestamp: row.Timestamp,
         latitude: row.Latitude,
