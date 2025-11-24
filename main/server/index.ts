@@ -180,8 +180,8 @@ export const registerIPCHandlers = async (): Promise<void> => {
         includeUUID: includeId,
         uuid: uuidv4(),
         sentencesPerPage: 5,
-        defaultToAllSelected: false,
-        includeMetadata: false,
+        defaultToAllSelected: true, // Default to selecting all sentences
+        includeMetadata: true, // Default to including metadata
       });
 
       await settingsRepo.save(settings);

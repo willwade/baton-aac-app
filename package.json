@@ -19,7 +19,8 @@
     "postinstall": "electron-builder install-app-deps",
     "lint": "eslint '*/**/*.{js,ts,tsx}' --fix",
     "typeorm": "ts-node ./node_modules/typeorm/cli.js",
-    "test-data": "ts-node -T test-data/build.ts --"
+    "test-data": "ts-node -T test-data/build.ts --",
+    "test-import-export": "ts-node scripts/test-import-export.ts"
   },
   "dependencies": {
     "@babel/plugin-proposal-decorators": "^7.12.1",

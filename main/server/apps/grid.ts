@@ -7,10 +7,12 @@ import { addEndMarkerToPhrase } from "../lib/add-end-marker-to-phrase";
 
 interface DatabaseRow {
   Text: string;
+  Content: string; // XML content with proper casing
 }
 
 interface PhraseHistoryRow {
   Text: string;
+  Content: string; // XML content with proper casing
   Timestamp: number;
   Latitude: number | null;
   Longitude: number | null;
@@ -20,6 +22,27 @@ export interface GridPhraseMetadata {
   timestamp: number; // .NET ticks
   latitude: number | null;
   longitude: number | null;
+}
+
+/**
+ * Parse Grid3 XML content to extract the properly cased text.
+ * Grid3 stores phrases as XML with <r> elements containing text fragments.
+ *
+ * Example:
+ * <p><s><r>I</r></s><s><r><![CDATA[ ]]></r></s><s><r>love</r></s></p>
+ * Returns: "I love"
+ */
+function parseGrid3XML(xmlContent: string): string {
+  // Extract all <r>...</r> content, including CDATA sections
+  const rTagRegex = /<r>(?:<!\[CDATA\[)?(.*?)(?:\]\]>)?<\/r>/g;
+  const matches: string[] = [];
+  let match;
+
+  while ((match = rTagRegex.exec(xmlContent)) !== null) {
+    matches.push(match[1]);
+  }
+
+  return matches.join("");
 }
 
 class Grid extends AAppDataGetters {
@@ -158,9 +181,9 @@ class Grid extends AAppDataGetters {
 
     const sentences = phrases
       .flat()
-      .map((phrase) => addEndMarkerToPhrase(phrase))
-      // Replace newlines with spaces to prevent getSentences() from splitting multi-line phrases
-      .map((phrase) => phrase.replace(/\n/g, " "));
+      // Split multi-line phrases into separate phrases (in case any exist)
+      .flatMap((phrase) => phrase.split(/\n/).filter((p) => p.trim() !== ""))
+      .map((phrase) => addEndMarkerToPhrase(phrase));
 
     const rawPhrases = sentences.join("\n");
 
@@ -197,6 +220,7 @@ class Grid extends AAppDataGetters {
    * Queries the sqlite database given.
    *
    * Selects all UNIQUE phrases from the PhraseHistory table.
+   * Parses the XML Content to get properly cased text.
    *
    * Only takes phrases with a real timestamp. For some reason
    * every phrase exists in history once without a timestamp even
@@ -208,7 +232,7 @@ class Grid extends AAppDataGetters {
     const databaseResult = (await new Promise((resolve, reject) => {
       database.all(
         `
-        SELECT DISTINCT p.Text
+        SELECT DISTINCT p.Content
         FROM PhraseHistory ph
         INNER JOIN Phrases p ON p.Id = ph.PhraseId
         WHERE "Timestamp" <> 0
@@ -223,7 +247,10 @@ class Grid extends AAppDataGetters {
 
     database.close();
 
-    const phrases = databaseResult.map((result) => result.Text);
+    // Parse XML content to get properly cased text
+    const phrases = databaseResult.map((result) =>
+      parseGrid3XML(result.Content)
+    );
 
     return phrases;
   }
@@ -240,7 +267,7 @@ class Grid extends AAppDataGetters {
     const databaseResult = (await new Promise((resolve, reject) => {
       database.all(
         `
-        SELECT p.Text, ph.Timestamp, ph.Latitude, ph.Longitude
+        SELECT p.Content, ph.Timestamp, ph.Latitude, ph.Longitude
         FROM PhraseHistory ph
         INNER JOIN Phrases p ON p.Id = ph.PhraseId
         WHERE ph.Timestamp <> 0
@@ -260,18 +287,26 @@ class Grid extends AAppDataGetters {
     const phraseMap = new Map<string, GridPhraseMetadata[]>();
 
     for (const row of databaseResult) {
-      // Process phrase the same way as getText() does:
-      // 1. Add end marker
-      // 2. Replace newlines with spaces (to match how phrases are stored)
-      const phrase = addEndMarkerToPhrase(row.Text).replace(/\n/g, " ");
-      const metadata: GridPhraseMetadata = {
-        timestamp: row.Timestamp,
-        latitude: row.Latitude,
-        longitude: row.Longitude,
-      };
+      // Parse XML content to get properly cased text
+      const text = parseGrid3XML(row.Content);
 
-      const existing = phraseMap.get(phrase) || [];
-      phraseMap.set(phrase, [...existing, metadata]);
+      // Split multi-line phrases into separate phrases
+      // Each line gets the same metadata (timestamp, location)
+      const lines = text.split(/\n/).filter((p) => p.trim() !== "");
+
+      for (const line of lines) {
+        // Process phrase the same way as getText() does:
+        // Add end marker
+        const phrase = addEndMarkerToPhrase(line);
+        const metadata: GridPhraseMetadata = {
+          timestamp: row.Timestamp,
+          latitude: row.Latitude,
+          longitude: row.Longitude,
+        };
+
+        const existing = phraseMap.get(phrase) || [];
+        phraseMap.set(phrase, [...existing, metadata]);
+      }
     }
 
     return phraseMap;
